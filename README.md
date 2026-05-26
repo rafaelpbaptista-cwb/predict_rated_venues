@@ -1,0 +1,2 @@
+# predict_rated_venues
+Exercício predição avaliação estabelecimentos
