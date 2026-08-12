@@ -1,0 +1,26 @@
+[project]
+name = "predict-rated-venues"
+version = "0.1.0"
+description = "Predição de avaliação de estabelecimentos em Toronto (F1-Score)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "nltk",
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "spacy",
+    "tqdm",
+    "xgboost",
+]
+
+[tool.ruff]
+extend-exclude = ["*.ipynb"]
+
+[tool.ruff.lint]
+# Habilitar Pyflakes (F), pycodestyle (E) e pydocstyle (D)
+select = ["E", "F"]
+ignore = ["D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
