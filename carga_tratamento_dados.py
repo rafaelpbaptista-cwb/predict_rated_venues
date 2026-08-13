@@ -21,6 +21,8 @@ from sklearn.preprocessing import StandardScaler
 from pandas import json_normalize
 
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 tqdm.pandas()
 SEM_VALOR = "SEM VALOR"
 
@@ -36,19 +38,22 @@ def carregar_dados(
     Parameters
     ----------
     carregar_train : bool, opcional
-        Se True, carrega o dataset de treinamento. Se False, carrega o dataset de teste. Padrão é True.
+        Se True, carrega o dataset de treinamento. Se False, carrega o dataset de teste.
+        Padrão é True.
+
     tratar_dados : bool, opcional
         Se True, aplica o pipeline de tratamento nos dados carregados. Padrão é True.
+
     div_dataset_validacao : bool, opcional
-        Se True e tratar_dados for True, divide os dados tratados em treino e validação (80/20)
-        salvando os arquivos no disco. Padrão é True.
+        Se True e tratar_dados for True, divide os dados tratados em treino e validação
+        (80/20) salvando os arquivos no disco. Padrão é True.
 
     Returns
     -------
     tuple[pd.DataFrame]
         Tupla contendo os DataFrames carregados (e possivelmente divididos).
     """
-    logging.info("Carregando dados")
+    logger.info("Carregando dados")
 
     if carregar_train:
         df = pd.read_csv(r"data\X_trainToronto.csv")
@@ -73,7 +78,8 @@ def carregar_dados(
 
 def _df_treino_teste_concat():
     """
-    Carrega e concatena os dados de treino e teste originais para geração de dicionários/vetores globais.
+    Carrega e concatena os dados de treino e teste originais para geração de 
+    dicionários/vetores globais.
 
     Returns
     -------
@@ -109,9 +115,10 @@ def _tratar_categorias_selecao_pca(
     Returns
     -------
     pd.DataFrame
-        DataFrame acrescido das 3 componentes PCA (`cat_pca_0`, `cat_pca_1`, `cat_pca_2`).
+        DataFrame acrescido das 3 componentes PCA (`cat_pca_0`, `cat_pca_1`, 
+        `cat_pca_2`).
     """
-    logging.info("Seleção PCA para categorias")
+    logger.info("Seleção PCA para categorias")
 
     df_aux = _df_treino_teste_concat()
 
@@ -368,7 +375,7 @@ def _tratamento_review(df: pd.DataFrame, carregar_train: bool) -> pd.DataFrame:
     pd.DataFrame
         DataFrame enriquecido com a feature contínua 'avg_sentimento'.
     """
-    logging.info("Tratando reviews")
+    logger.info("Tratando reviews")
 
     if carregar_train:
         df_reviews = pd.read_csv(r"data\reviewsTrainToronto.csv")
@@ -404,7 +411,7 @@ def _tratar_categorias_nao_populares(df: pd.DataFrame, carregar_train: bool):
         Se True, gera e salva a lista de vetores de categorias mal avaliadas.
         Se False, carrega a lista existente.
     """
-    logging.info("Tratando categorias não populares usando similaridade do cosseno")
+    logger.info("Tratando categorias não populares usando similaridade do cosseno")
     nlp = spacy.load("en_core_web_md")
 
     if carregar_train:
@@ -456,7 +463,7 @@ def _tratar_coluna_categoria_embedding(df: pd.DataFrame) -> None:
     df : pd.DataFrame
         DataFrame em tratamento. A feature `categories_embedding` é adicionada in-place.
     """
-    logging.info("Acrescentando coluna embedding para representar as categorias")
+    logger.info("Acrescentando coluna embedding para representar as categorias")
 
     nlp = spacy.load("en_core_web_md")
 
@@ -485,7 +492,7 @@ def _tratar_linhas_categoria_vazia(df: pd.DataFrame) -> pd.DataFrame:
     pd.DataFrame
         DataFrame com as categorias vazias preenchidas.
     """
-    logging.info("Tratando linhas com categoria vazia")
+    logger.info("Tratando linhas com categoria vazia")
 
     df["categories"] = df["categories"].fillna(SEM_VALOR)
 
@@ -505,7 +512,7 @@ def _tratar_categorias_populares(df: pd.DataFrame, carregar_train: bool):
     carregar_train : bool
         Se True, minera as categorias populares e salva a lista. Se False, carrega a lista.
     """
-    logging.info("Adicionando coluna categoria popular")
+    logger.info("Adicionando coluna categoria popular")
 
     if carregar_train:
         df_cat = df.copy()
@@ -586,7 +593,7 @@ def _padronizar_dados_df(df: pd.DataFrame, carregar_train: bool) -> pd.DataFrame
     pd.DataFrame
         DataFrame com as variáveis independentes padronizadas.
     """
-    logging.info("Padronizar dados")
+    logger.info("Padronizar dados")
 
     df_aux = df.drop(columns="destaque")
 
