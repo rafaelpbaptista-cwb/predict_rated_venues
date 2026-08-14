@@ -5,9 +5,11 @@ description = "Predição de avaliação de estabelecimentos em Toronto (F1-Scor
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "en-core-web-md",
+    "ipykernel>=7.3.0",
     "ipython>=9.16.1",
     "nltk",
-    "numpy",
+    "numpy<2",
     "pandas",
     "scikit-learn",
     "spacy",
@@ -25,3 +27,6 @@ ignore = ["D"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
+
+[tool.uv.sources]
+en-core-web-md = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.7.1/en_core_web_md-3.7.1-py3-none-any.whl" }
