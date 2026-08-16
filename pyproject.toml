@@ -10,6 +10,7 @@ dependencies = [
     "ipython>=9.16.1",
     "nltk",
     "numpy<2",
+    "openpyxl>=3.1.5",
     "pandas",
     "scikit-learn",
     "spacy",

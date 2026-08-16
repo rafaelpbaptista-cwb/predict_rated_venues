@@ -112,7 +112,6 @@ def treinar_xgboost(
         "colsample_bytree": [0.8, 0.9],
         "scale_pos_weight": [1, 2],
         "random_state": [42],
-        "use_label_encoder": [False],
         "eval_metric": ["logloss"],
     }
 
@@ -121,7 +120,6 @@ def treinar_xgboost(
         "n_estimators": [50, 100],
         "max_depth": [3, 6],
         "random_state": [42],
-        "use_label_encoder": [False],
         "eval_metric": ["logloss"],
     }
 

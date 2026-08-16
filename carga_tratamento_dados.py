@@ -2,7 +2,8 @@
 Módulo de engenharia de atributos e processamento de dados brutos.
 
 Responsável pelo fluxo completo de ingestão e transformação dos dados,
-incluindo tratamentos categóricos (PCA), geoespaciais (DBSCAN) e de texto (Embeddings NLP).
+incluindo tratamentos categóricos (PCA), geoespaciais (DBSCAN) e de texto
+(Embeddings NLP).
 """
 
 import pickle
@@ -78,7 +79,7 @@ def carregar_dados(
 
 def _df_treino_teste_concat():
     """
-    Carrega e concatena os dados de treino e teste originais para geração de 
+    Carrega e concatena os dados de treino e teste originais para geração de
     dicionários/vetores globais.
 
     Returns
@@ -108,6 +109,7 @@ def _tratar_categorias_selecao_pca(
     ----------
     df : pd.DataFrame
         DataFrame em tratamento.
+
     carregar_train : bool
         Indica se estamos operando nos dados de treino (treina o modelo PCA)
         ou teste (carrega o modelo existente e aplica).
@@ -115,7 +117,7 @@ def _tratar_categorias_selecao_pca(
     Returns
     -------
     pd.DataFrame
-        DataFrame acrescido das 3 componentes PCA (`cat_pca_0`, `cat_pca_1`, 
+        DataFrame acrescido das 3 componentes PCA (`cat_pca_0`, `cat_pca_1`,
         `cat_pca_2`).
     """
     logger.info("Seleção PCA para categorias")
@@ -147,8 +149,7 @@ def _tratar_categorias_selecao_pca(
 
         df_pca = pd.DataFrame(pca.transform(df_dummies_group))
 
-    df_aux.set_index("business_id", inplace=True)
-    df_pca.index = df_aux.index
+    df_pca.index = df_dummies_group.index
     df_pca.columns = [f"cat_pca_{i}" for i in range(qtdade_componentes_pca)]
 
     return pd.merge(df, df_pca, left_index=True, right_index=True, how="inner")
@@ -156,7 +157,7 @@ def _tratar_categorias_selecao_pca(
 
 def _tratar_df(df: pd.DataFrame, carregar_train: bool) -> pd.DataFrame:
     """
-    Executa o pipeline completo de tratamentos em um DataFrame.
+    Executa a pipeline de tratamenta do DataFrame dos dados a serem avaliados.
 
     Orquestra chamadas a todos os métodos privados de transformação:
     (categorias vazias, PCA de categorias, embedding NLP, DBSCAN, etc).
@@ -165,6 +166,7 @@ def _tratar_df(df: pd.DataFrame, carregar_train: bool) -> pd.DataFrame:
     ----------
     df : pd.DataFrame
         DataFrame base a ser tratado.
+
     carregar_train : bool
         Indica o contexto de execução (treinamento vs teste) para salvar ou carregar
         modelos auxiliares de transformação.
@@ -174,7 +176,7 @@ def _tratar_df(df: pd.DataFrame, carregar_train: bool) -> pd.DataFrame:
     pd.DataFrame
         DataFrame completamente tratado e pronto para consumo pelo modelo.
     """
-    df.set_index("business_id", inplace=True)
+    df = df.set_index("business_id")
 
     df = _tratar_linhas_categoria_vazia(df)
     df = _tratar_categorias_selecao_pca(df, carregar_train)
@@ -268,7 +270,7 @@ def _tratar_agrupamento_dbscan_latitude_longitude(
     for coluna in [
         coluna for coluna in df_merged.columns if nome_coluna_agrupamento in coluna
     ]:
-        df_merged[coluna] = df_merged[coluna].fillna(False)
+        df_merged[coluna] = df_merged[coluna].fillna(0.0).astype(float)
 
     return df_merged
 
@@ -319,21 +321,11 @@ def _tratar_attributes_selecao_pca(
     df_treino_teste["attributes_dict"] = df_treino_teste["attributes"].apply(parse_json)
 
     attributes_df = json_normalize(df_treino_teste["attributes_dict"])
-
     attributes_df["RestaurantsPriceRange2"] = attributes_df[
         "RestaurantsPriceRange2"
     ].fillna(0)
-    attributes_df = attributes_df.join(
-        pd.get_dummies(
-            attributes_df["RestaurantsPriceRange2"], prefix="RestaurantsPriceRange2"
-        )
-    ).drop(columns="RestaurantsPriceRange2")
-
-    for coluna in attributes_df.columns:
-        attributes_df[coluna] = attributes_df[coluna].fillna("False")
-        attributes_df = attributes_df.join(
-            pd.get_dummies(attributes_df[coluna], prefix=coluna)
-        ).drop(columns=coluna)
+    attributes_df = attributes_df.fillna("False").astype(str)
+    attributes_df = pd.get_dummies(attributes_df, dtype=float)
 
     qtdade_componentes_pca = 3
 
@@ -407,6 +399,7 @@ def _tratar_categorias_nao_populares(df: pd.DataFrame, carregar_train: bool):
     ----------
     df : pd.DataFrame
         DataFrame em tratamento. A feature é adicionada in-place.
+
     carregar_train : bool
         Se True, gera e salva a lista de vetores de categorias mal avaliadas.
         Se False, carrega a lista existente.
@@ -433,21 +426,25 @@ def _tratar_categorias_nao_populares(df: pd.DataFrame, carregar_train: bool):
         with open("data/treinamento/lista_cat_mau_aval.pkl", "rb") as file:
             lista_cat_mau_aval = pickle.load(file)
 
-    def calculate_max_cosine_similarity(row):
-        valores = []
+    if lista_cat_mau_aval:
+        bad_matrix = np.vstack(
+            [v.reshape(1, -1) if v.ndim == 1 else v for v in lista_cat_mau_aval]
+        )
+    else:
+        bad_matrix = None
 
-        for cat_word_embedding in lista_cat_mau_aval:
-            valores.append(
-                cosine_similarity(
-                    cat_word_embedding,
-                    nlp(row["categories"]).vector.reshape(1, -1),
-                )
-            )
+    cat_cache = {}
 
-        return np.max(np.array(valores).flatten())
+    def calculate_max_cosine_similarity(categories_str):
+        if bad_matrix is None or not categories_str:
+            return 0.0
+        if categories_str not in cat_cache:
+            vec = nlp(categories_str).vector.reshape(1, -1)
+            cat_cache[categories_str] = float(cosine_similarity(vec, bad_matrix).max())
+        return cat_cache[categories_str]
 
-    df["categories_cossine"] = df.progress_apply(
-        lambda row: calculate_max_cosine_similarity(row), axis="columns"
+    df["categories_cossine"] = df["categories"].progress_apply(
+        calculate_max_cosine_similarity
     )
 
 
@@ -467,13 +464,15 @@ def _tratar_coluna_categoria_embedding(df: pd.DataFrame) -> None:
 
     nlp = spacy.load("en_core_web_md")
 
-    def mean_embedding(texts):
-        embeddings = [nlp(text).vector for text in texts]
-        return np.array([np.mean(embedding, axis=0) for embedding in embeddings])[0]
+    cat_emb_cache = {}
 
-    df["categories_embedding"] = df["categories"].progress_apply(
-        lambda x: mean_embedding([x])
-    )
+    def mean_embedding(text):
+        if text not in cat_emb_cache:
+            vec = nlp(text).vector
+            cat_emb_cache[text] = float(np.mean(vec)) if len(vec) > 0 else 0.0
+        return cat_emb_cache[text]
+
+    df["categories_embedding"] = df["categories"].progress_apply(mean_embedding)
 
 
 def _tratar_linhas_categoria_vazia(df: pd.DataFrame) -> pd.DataFrame:
@@ -539,7 +538,7 @@ def _tratar_categorias_populares(df: pd.DataFrame, carregar_train: bool):
         words = category.split(", ")
         return any(word in lista_categorias for word in words)
 
-    df["popular_categories"] = df["categories"].apply(contains_word)
+    df["popular_categories"] = df["categories"].apply(contains_word).astype(float)
 
 
 def _apagar_ordenar_colunas(df):
@@ -595,7 +594,7 @@ def _padronizar_dados_df(df: pd.DataFrame, carregar_train: bool) -> pd.DataFrame
     """
     logger.info("Padronizar dados")
 
-    df_aux = df.drop(columns="destaque")
+    df_aux = df.drop(columns="destaque").astype(float)
 
     if carregar_train:
         scaler = StandardScaler()
